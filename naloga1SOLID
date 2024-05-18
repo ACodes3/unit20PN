@@ -1,0 +1,119 @@
+#include <QCoreApplication>
+#include <QVector>
+#include <QRandomGenerator>
+#include <iostream>
+#include <memory>
+
+class Interval {
+public:
+    int start;
+    int end;
+
+    Interval(int s, int e) : start(s), end(e) {}
+};
+
+class IIntervalManager {
+public:
+    virtual ~IIntervalManager() = default;
+    virtual void addInterval(int start, int end) = 0;
+    virtual void splitInterval(int index, int randomNumber) = 0;
+    virtual int getIntervalStart(int index) const = 0;
+    virtual int getIntervalEnd(int index) const = 0;
+    virtual int intervalCount() const = 0;
+};
+
+class IntervalManager : public IIntervalManager {
+private:
+    QVector<Interval> intervals;
+
+public:
+    IntervalManager() {
+        intervals.append(Interval(1, 1000000));
+    }
+
+    void addInterval(int start, int end) override {
+        intervals.append(Interval(start, end));
+    }
+
+    void splitInterval(int index, int randomNumber) override {
+        int oldStart = intervals[index].start;
+        int oldEnd = intervals[index].end;
+
+        if (randomNumber == oldStart && randomNumber == oldEnd) {
+            intervals.remove(index);
+        } else if (randomNumber == oldStart) {
+            intervals[index].start = randomNumber + 1;
+        } else if (randomNumber == oldEnd) {
+            intervals[index].end = randomNumber - 1;
+        } else {
+            intervals.insert(index + 1, Interval(randomNumber + 1, oldEnd));
+            intervals[index].end = randomNumber - 1;
+        }
+    }
+
+    int getIntervalStart(int index) const override {
+        return intervals[index].start;
+    }
+
+    int getIntervalEnd(int index) const override {
+        return intervals[index].end;
+    }
+
+    int intervalCount() const override {
+        return intervals.size();
+    }
+};
+
+class IRandomGenerator {
+public:
+    virtual ~IRandomGenerator() = default;
+    virtual int bounded(int low, int high) const = 0;
+    virtual int bounded(int high) const = 0;
+};
+
+class QtRandomGenerator : public IRandomGenerator {
+public:
+    int bounded(int low, int high) const override {
+        return QRandomGenerator::global()->bounded(low, high);
+    }
+
+    int bounded(int high) const override {
+        return QRandomGenerator::global()->bounded(high);
+    }
+};
+
+class RandomNumberGenerator {
+private:
+    std::unique_ptr<IIntervalManager> intervalManager;
+    std::unique_ptr<IRandomGenerator> randomGenerator;
+
+public:
+    RandomNumberGenerator(std::unique_ptr<IIntervalManager> im, std::unique_ptr<IRandomGenerator> rg)
+        : intervalManager(std::move(im)), randomGenerator(std::move(rg)) {}
+
+    int getRandomNumber() {
+        int randomIndex = randomGenerator->bounded(intervalManager->intervalCount());
+        int randomIntervalStart = intervalManager->getIntervalStart(randomIndex);
+        int randomIntervalEnd = intervalManager->getIntervalEnd(randomIndex);
+
+        int randomNumber = randomGenerator->bounded(randomIntervalStart, randomIntervalEnd + 1);
+
+        intervalManager->splitInterval(randomIndex, randomNumber);
+
+        return randomNumber;
+    }
+};
+
+int main(int argc, char *argv[]) {
+    QCoreApplication a(argc, argv);
+
+    auto intervalManager = std::make_unique<IntervalManager>();
+    auto randomGenerator = std::make_unique<QtRandomGenerator>();
+    RandomNumberGenerator rng(std::move(intervalManager), std::move(randomGenerator));
+
+    for (int i = 0; i < 1000; ++i) {
+        std::cout << "Naključno število " << i + 1 << ": " << rng.getRandomNumber() << std::endl;
+    }
+
+    return a.exec();
+}

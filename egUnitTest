@@ -54,7 +54,7 @@ void TestRandomNumberGenerator::testRandomNumberSelection() {
 
     int number = rng.getRandomNumber();
     QVERIFY(number >= 1 && number <= 1000000);
-    QCOMPARE(rng.intervalManager->intervalCount(), 2); // Assuming first interval is split into two
+    QCOMPARE(rng.intervalManager->intervalCount(), 2); 
 }
 
 QTEST_MAIN(TestIntervalManager)
